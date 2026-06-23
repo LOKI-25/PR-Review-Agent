@@ -1,0 +1,105 @@
+{
+  "Comment": "PR Review Multi-Agent Pipeline",
+  "StartAt": "FetchPR",
+  "States": {
+    "FetchPR": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:REGION:ACCOUNT_ID:function:fetch-pr",
+      "ResultPath": "$.fetchResult",
+      "Next": "ParallelReview",
+      "Catch": [{ "ErrorEquals": ["States.ALL"], "Next": "Failed" }]
+    },
+    "ParallelReview": {
+      "Type": "Parallel",
+      "ResultPath": "$.agentResults",
+      "Branches": [
+        {
+          "StartAt": "SecurityAgent",
+          "States": {
+            "SecurityAgent": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:REGION:ACCOUNT_ID:function:security-agent",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "QualityAgent",
+          "States": {
+            "QualityAgent": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:REGION:ACCOUNT_ID:function:quality-agent",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "LogicAgent",
+          "States": {
+            "LogicAgent": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:REGION:ACCOUNT_ID:function:logic-agent",
+              "End": true
+            }
+          }
+        }
+      ],
+      "Next": "Summarize",
+      "Catch": [{ "ErrorEquals": ["States.ALL"], "Next": "Failed" }]
+    },
+    "Summarize": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:REGION:ACCOUNT_ID:function:summarizer",
+      "ResultPath": "$.summaryResult",
+      "Next": "PostComment",
+      "Catch": [{ "ErrorEquals": ["States.ALL"], "Next": "Failed" }]
+    },
+    "PostComment": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:REGION:ACCOUNT_ID:function:post-comment",
+      "ResultPath": "$.commentResult",
+      "Next": "WaitForApproval",
+      "Catch": [{ "ErrorEquals": ["States.ALL"], "Next": "Failed" }]
+    },
+    "WaitForApproval": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke.waitForTaskToken",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:REGION:ACCOUNT_ID:function:approval",
+        "Payload": {
+          "taskToken.$": "$$.Task.Token",
+          "runId.$": "$.runId",
+          "prUrl.$": "$.prUrl",
+          "commentUrl.$": "$.commentResult.commentUrl"
+        }
+      },
+      "ResultPath": "$.approvalResult",
+      "Next": "CheckDecision",
+      "Catch": [{ "ErrorEquals": ["States.ALL"], "Next": "Failed" }]
+    },
+    "CheckDecision": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.approvalResult.decision",
+          "StringEquals": "approved",
+          "Next": "Approved"
+        }
+      ],
+      "Default": "Rejected"
+    },
+    "Approved": {
+      "Type": "Succeed"
+    },
+    "Rejected": {
+      "Type": "Fail",
+      "Error": "ReviewRejected",
+      "Cause": "Human reviewer rejected the PR review"
+    },
+    "Failed": {
+      "Type": "Fail",
+      "Error": "PipelineFailed",
+      "Cause": "An agent or step encountered an error"
+    }
+  }
+}
