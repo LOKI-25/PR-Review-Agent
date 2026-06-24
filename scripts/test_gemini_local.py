@@ -48,7 +48,7 @@ def main() -> int:
         logger.error("GEMINI_API_KEY is not set. Copy .env.example to .env and add your key.")
         return 1
 
-    logger.info("Calling Gemini 2.0 Flash with sample diff...")
+    logger.info("Calling Gemini (%s) with sample diff...", os.environ.get("GEMINI_MODEL", "gemini-2.5-flash-lite"))
     result = call_gemini(SECURITY_PROMPT, f"Review this PR diff:\n\n{SAMPLE_DIFF}")
 
     if not isinstance(result, dict):
