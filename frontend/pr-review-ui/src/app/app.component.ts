@@ -22,9 +22,9 @@ import { ExecutionsSidebarComponent } from './executions-sidebar.component';
     .main-content {
       flex: 1;
       overflow-y: auto;
-      background: #fff;
+      background: var(--bg);
     }
-  `]
+  `],
 })
 export class AppComponent {
   title = 'AI PR Review';
