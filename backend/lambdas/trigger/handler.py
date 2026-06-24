@@ -5,6 +5,7 @@ import os
 import boto3
 from datetime import datetime, timezone
 from shared.dynamo_client import get_run, list_runs
+from shared.execution_sync import TERMINAL_STATUSES, sync_run_with_execution
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -63,10 +64,15 @@ def process(event: dict) -> dict:
 
 def list_all_runs() -> dict:
     runs = list_runs()
+    synced_runs = []
+    for run in runs:
+        if run.get("status") not in TERMINAL_STATUSES:
+            run = sync_run_with_execution(run)
+        synced_runs.append(run)
     return {
         "statusCode": 200,
         "headers": CORS_HEADERS,
-        "body": json.dumps({"runs": runs}, default=str),
+        "body": json.dumps({"runs": synced_runs}, default=str),
     }
 
 
@@ -86,6 +92,8 @@ def get_run_status(event: dict) -> dict:
             "headers": CORS_HEADERS,
             "body": json.dumps({"error": "Run not found"}),
         }
+
+    item = sync_run_with_execution(item)
 
     return {
         "statusCode": 200,
@@ -131,13 +139,23 @@ def start_review(event: dict) -> dict:
             "githubCommentUrl": "",
             "approvedBy": "",
             "rejectedReason": "",
+            "executionArn": "",
         }
     )
 
-    sfn_client.start_execution(
+    execution = sfn_client.start_execution(
         stateMachineArn=state_machine_arn,
         name=run_id,
         input=json.dumps({"runId": run_id, "prUrl": pr_url}),
+    )
+
+    table.update_item(
+        Key={"runId": run_id},
+        UpdateExpression="SET executionArn = :arn, updatedAt = :updatedAt",
+        ExpressionAttributeValues={
+            ":arn": execution["executionArn"],
+            ":updatedAt": datetime.now(timezone.utc).isoformat(),
+        },
     )
 
     return {
