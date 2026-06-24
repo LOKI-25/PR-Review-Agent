@@ -28,6 +28,23 @@ export function isFailureStatus(status: string): boolean {
   return status === 'REJECTED' || status === 'FAILED';
 }
 
+/** Poll while the pipeline is actively running; stop once waiting on a human or finished. */
+export function shouldPollStatus(status: string): boolean {
+  return (
+    !isTerminalStatus(status) &&
+    status !== 'AWAITING_APPROVAL'
+  );
+}
+
+/** No DynamoDB update for this long while still "active" usually means Step Functions failed. */
+export const STALE_RUN_MINUTES = 8;
+
+export function isStaleActiveRun(status: string, updatedAt?: string): boolean {
+  if (!updatedAt || !shouldPollStatus(status)) return false;
+  const minutes = (Date.now() - new Date(updatedAt).getTime()) / 60000;
+  return minutes >= STALE_RUN_MINUTES;
+}
+
 export function progressPercent(status: string): number {
   const index = getStepIndex(status);
   if (index < 0) {

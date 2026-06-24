@@ -1,9 +1,10 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { RouterLink, RouterLinkActive } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { ApiService, RunSummary } from './api.service';
 import { ExecutionsService } from './executions.service';
+import { shouldPollStatus } from './pipeline-status';
 
 @Component({
   selector: 'app-executions-sidebar',
@@ -114,30 +115,45 @@ export class ExecutionsSidebarComponent implements OnInit, OnDestroy {
   runs: RunSummary[] = [];
   loading = false;
   error = '';
-  private pollInterval: ReturnType<typeof setInterval> | null = null;
+  private sidebarPollInterval: ReturnType<typeof setInterval> | null = null;
   private subs = new Subscription();
-
   constructor(
     private api: ApiService,
     private executions: ExecutionsService,
-    private router: Router,
   ) {}
 
   ngOnInit() {
     this.loadRuns();
-    this.pollInterval = setInterval(() => this.loadRuns(true), 10000);
     this.subs.add(
-      this.executions.refresh$.subscribe(() => this.loadRuns(true))
+      this.executions.refresh$.subscribe(() => {
+        this.loadRuns(true);
+        this.startPollingAfterSubmit();
+      }),
     );
   }
 
-  loadRuns(silent = false) {
+  private startPollingAfterSubmit() {
+    this.stopSidebarPolling();
+    this.sidebarPollInterval = setInterval(() => this.loadRuns(true, true), 10000);
+  }
+
+  private stopSidebarPolling() {
+    if (this.sidebarPollInterval) {
+      clearInterval(this.sidebarPollInterval);
+      this.sidebarPollInterval = null;
+    }
+  }
+
+  loadRuns(silent = false, fromPoll = false) {
     if (!silent) this.loading = true;
     this.api.listRuns().subscribe({
       next: (res) => {
         this.runs = res.runs;
         this.loading = false;
         this.error = '';
+        if (fromPoll && !this.runs.some((run) => shouldPollStatus(run.status))) {
+          this.stopSidebarPolling();
+        }
       },
       error: () => {
         this.loading = false;
@@ -147,7 +163,7 @@ export class ExecutionsSidebarComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
-    if (this.pollInterval) clearInterval(this.pollInterval);
+    this.stopSidebarPolling();
     this.subs.unsubscribe();
   }
 }

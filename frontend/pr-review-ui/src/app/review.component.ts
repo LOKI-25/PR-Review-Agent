@@ -5,7 +5,7 @@ import { Subscription } from 'rxjs';
 import { ApiService, Finding, RunStatus } from './api.service';
 import { PipelineProgressComponent } from './pipeline-progress.component';
 import { MarkdownPipe } from './markdown.pipe';
-import { isTerminalStatus } from './pipeline-status';
+import { isTerminalStatus, isStaleActiveRun, shouldPollStatus, STALE_RUN_MINUTES } from './pipeline-status';
 
 @Component({
   selector: 'app-review',
@@ -22,6 +22,15 @@ import { isTerminalStatus } from './pipeline-status';
       </header>
 
       <app-pipeline-progress [status]="runData.status" />
+
+      <section class="alert stale" *ngIf="staleWarning">
+        No progress for {{ staleRunMinutes }}+ minutes. The pipeline may have failed in AWS
+        (for example LLM quota limits). Refresh the page or check Step Functions.
+      </section>
+
+      <section class="alert failed" *ngIf="runData.status === 'FAILED'">
+        Pipeline failed{{ runData.rejectedReason ? ': ' + runData.rejectedReason : '' }}
+      </section>
 
       <section class="meta-card">
         <div class="meta-row">
@@ -40,7 +49,7 @@ import { isTerminalStatus } from './pipeline-status';
           <span class="meta-label">Approved by</span>
           <span>{{ runData.approvedBy }}</span>
         </div>
-        <div class="meta-row rejected" *ngIf="runData.rejectedReason">
+        <div class="meta-row rejected" *ngIf="runData.rejectedReason && runData.status !== 'FAILED'">
           <span class="meta-label">Rejection</span>
           <span>{{ runData.rejectedReason }}</span>
         </div>
@@ -110,7 +119,7 @@ import { isTerminalStatus } from './pipeline-status';
         <div class="markdown-body" [innerHTML]="runData.finalReview | markdown"></div>
       </section>
 
-      <p class="polling-hint" *ngIf="!isTerminal">
+      <p class="polling-hint" *ngIf="isPolling">
         <span class="live-dot"></span>
         Live updating every 5 seconds
       </p>
@@ -195,6 +204,24 @@ import { isTerminalStatus } from './pipeline-status';
     .meta-link:hover { text-decoration: underline; }
     .meta-link.accent { font-weight: 600; }
     .meta-row.rejected { color: #b91c1c; }
+    .alert {
+      border-radius: 10px;
+      padding: 0.9rem 1rem;
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+    .alert.stale {
+      background: #fff7ed;
+      border: 1px solid #fdba74;
+      color: #9a3412;
+    }
+    .alert.failed {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+      font-weight: 500;
+    }
     .findings-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -331,6 +358,8 @@ export class ReviewComponent implements OnInit, OnDestroy {
   runId = '';
   runData: RunStatus | null = null;
   pollingInterval: ReturnType<typeof setInterval> | null = null;
+  staleWarning = false;
+  readonly staleRunMinutes = STALE_RUN_MINUTES;
   private routeSub: Subscription | null = null;
   private fetchGeneration = 0;
 
@@ -346,11 +375,15 @@ export class ReviewComponent implements OnInit, OnDestroy {
     this.stopPolling();
     this.runId = runId;
     this.runData = null;
+    this.staleWarning = false;
     this.fetchGeneration++;
 
     if (!runId) return;
-
     this.fetchStatus();
+  }
+
+  private startPolling() {
+    if (this.pollingInterval) return;
     this.pollingInterval = setInterval(() => this.fetchStatus(), 5000);
   }
 
@@ -379,6 +412,10 @@ export class ReviewComponent implements OnInit, OnDestroy {
     return this.runData ? isTerminalStatus(this.runData.status) : false;
   }
 
+  get isPolling(): boolean {
+    return this.pollingInterval !== null;
+  }
+
   severityClass(finding: Finding): string {
     const severity = (finding.severity || 'info').toLowerCase();
     if (['high', 'critical'].includes(severity)) return 'high';
@@ -397,8 +434,13 @@ export class ReviewComponent implements OnInit, OnDestroy {
         if (generation !== this.fetchGeneration || runId !== this.runId) return;
 
         this.runData = data;
-        if (isTerminalStatus(data.status)) {
+        if (shouldPollStatus(data.status) && !isStaleActiveRun(data.status, data.updatedAt)) {
+          this.startPolling();
+        } else {
           this.stopPolling();
+          if (isStaleActiveRun(data.status, data.updatedAt)) {
+            this.staleWarning = true;
+          }
         }
       },
       error: (err) => console.error('Error fetching status', err),
