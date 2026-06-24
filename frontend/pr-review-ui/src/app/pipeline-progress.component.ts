@@ -32,21 +32,23 @@ import {
           <div class="shimmer" *ngIf="!isTerminal && !isFailure"></div>
         </div>
 
-        <ol class="steps">
-          <li
-            *ngFor="let step of steps; let i = index"
-            class="step"
-            [class]="stateFor(i)"
-          >
-            <div class="node">
-              <span class="icon" *ngIf="stateFor(i) === 'complete'">✓</span>
-              <span class="icon" *ngIf="stateFor(i) === 'failed'">!</span>
-              <span class="pulse" *ngIf="stateFor(i) === 'active'"></span>
-              <span class="dot" *ngIf="stateFor(i) === 'upcoming'"></span>
-            </div>
-            <span class="label">{{ step.label }}</span>
-          </li>
-        </ol>
+        <div class="steps-scroll">
+          <ol class="steps">
+            <li
+              *ngFor="let step of steps; let i = index"
+              class="step"
+              [class]="stateFor(i)"
+            >
+              <div class="node">
+                <span class="icon" *ngIf="stateFor(i) === 'complete'">✓</span>
+                <span class="icon" *ngIf="stateFor(i) === 'failed'">!</span>
+                <span class="pulse" *ngIf="stateFor(i) === 'active'"></span>
+                <span class="dot" *ngIf="stateFor(i) === 'upcoming'"></span>
+              </div>
+              <span class="label">{{ step.label }}</span>
+            </li>
+          </ol>
+        </div>
       </div>
 
       <p class="status-copy">{{ statusDescription }}</p>
@@ -91,6 +93,9 @@ import {
     }
     .failed .percent { color: #fca5a5; }
     .track-wrap { position: relative; padding-top: 0.25rem; }
+    .steps-scroll {
+      overflow: visible;
+    }
     .track {
       position: relative;
       height: 6px;
@@ -200,6 +205,46 @@ import {
     @media (max-width: 900px) {
       .steps { grid-template-columns: repeat(4, 1fr); row-gap: 0.75rem; }
       .step:nth-child(n+5) { grid-column: span 1; }
+    }
+    @media (max-width: 768px) {
+      .pipeline {
+        padding: 1rem 1rem 0.9rem;
+        border-radius: 12px;
+        margin-bottom: 1.25rem;
+      }
+      .pipeline-header {
+        flex-direction: column;
+        gap: 0.35rem;
+        margin-bottom: 1rem;
+      }
+      h3 {
+        font-size: 1rem;
+      }
+      .percent {
+        font-size: 1.25rem;
+      }
+      .steps-scroll {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        margin: 0 -0.25rem;
+        padding: 0 0.25rem 0.25rem;
+      }
+      .steps {
+        min-width: 520px;
+        grid-template-columns: repeat(7, minmax(64px, 1fr));
+        gap: 0.35rem;
+      }
+      .label {
+        font-size: 0.62rem;
+        max-width: none;
+      }
+      .node {
+        width: 24px;
+        height: 24px;
+      }
+      .status-copy {
+        font-size: 0.8rem;
+      }
     }
   `],
 })

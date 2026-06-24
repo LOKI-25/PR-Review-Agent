@@ -352,6 +352,48 @@ import { isTerminalStatus, isStaleActiveRun, shouldPollStatus, STALE_RUN_MINUTES
       margin-bottom: 1rem;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 768px) {
+      .page {
+        padding: 1rem 1rem 2rem;
+      }
+      .hero {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+      }
+      h1 {
+        font-size: 1.15rem;
+        word-break: break-all;
+      }
+      .status-pill {
+        align-self: flex-start;
+        font-size: 0.7rem;
+        white-space: normal;
+      }
+      .meta-row {
+        grid-template-columns: 1fr;
+        gap: 0.35rem;
+      }
+      .findings-grid {
+        grid-template-columns: 1fr;
+      }
+      .finding-card li {
+        flex-direction: column;
+        gap: 0.4rem;
+      }
+      .review-card-head {
+        padding: 0.85rem 1rem;
+      }
+      .markdown-body {
+        padding: 1rem;
+        font-size: 0.9rem;
+        overflow-x: auto;
+      }
+      .alert {
+        font-size: 0.85rem;
+      }
+    }
   `],
 })
 export class ReviewComponent implements OnInit, OnDestroy {

@@ -1,9 +1,11 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink, RouterLinkActive } from '@angular/router';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { Subscription } from 'rxjs';
+import { filter } from 'rxjs/operators';
 import { ApiService, RunSummary } from './api.service';
 import { ExecutionsService } from './executions.service';
+import { LayoutService } from './layout.service';
 import { shouldPollStatus } from './pipeline-status';
 
 @Component({
@@ -109,6 +111,29 @@ import { shouldPollStatus } from './pipeline-status';
     .FAILED, .REJECTED { background: #fecaca; color: #991b1b; }
     .loading, .empty, .error { padding: 1rem; font-size: 0.85rem; color: #64748b; }
     .error { color: #dc2626; }
+
+    @media (max-width: 768px) {
+      :host {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        z-index: 50;
+        width: min(88vw, 300px);
+        transform: translateX(-105%);
+        transition: transform 0.25s ease;
+        box-shadow: none;
+      }
+      :host.open {
+        transform: translateX(0);
+        box-shadow: 8px 0 32px rgba(15, 23, 42, 0.18);
+      }
+      .sidebar {
+        width: 100%;
+        min-width: 0;
+        height: 100%;
+      }
+    }
   `]
 })
 export class ExecutionsSidebarComponent implements OnInit, OnDestroy {
@@ -120,6 +145,8 @@ export class ExecutionsSidebarComponent implements OnInit, OnDestroy {
   constructor(
     private api: ApiService,
     private executions: ExecutionsService,
+    private router: Router,
+    private layout: LayoutService,
   ) {}
 
   ngOnInit() {
@@ -129,6 +156,11 @@ export class ExecutionsSidebarComponent implements OnInit, OnDestroy {
         this.loadRuns(true);
         this.startPollingAfterSubmit();
       }),
+    );
+    this.subs.add(
+      this.router.events
+        .pipe(filter((event) => event instanceof NavigationEnd))
+        .subscribe(() => this.layout.closeMobileMenu()),
     );
   }
 

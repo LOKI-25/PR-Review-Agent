@@ -158,6 +158,25 @@ import { ExecutionsService } from './executions.service';
       padding: 0.35rem 0.65rem;
       border-radius: 999px;
     }
+    @media (max-width: 768px) {
+      .page {
+        padding: 1.25rem 1rem;
+        align-items: stretch;
+      }
+      .card {
+        padding: 1.35rem 1.15rem;
+        border-radius: 16px;
+      }
+      h1 {
+        font-size: 1.5rem;
+      }
+      .subtitle {
+        font-size: 0.92rem;
+      }
+      input {
+        font-size: 16px;
+      }
+    }
   `],
 })
 export class SubmitComponent {
